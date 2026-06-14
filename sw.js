@@ -4,7 +4,7 @@
    ✅ Notifikasi sistem jalan saat PWA diminimalkan
    ✅ Cache cerdas: cepat tapi data selalu akurat
    ========================================================= */
-const VERSI = 'v1.1-taximeter-kolaka'; // ubah angka ini tiap update agar otomatis ter-refresh
+const VERSI = 'v1.2-taximeter-kolaka'; // ubah angka ini tiap update agar otomatis ter-refresh
 
 // Daftar file yang disimpan di HP agar buka lebih cepat & bisa offline
 const DAFTAR_CACHE = [
