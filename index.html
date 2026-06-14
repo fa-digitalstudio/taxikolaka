@@ -137,11 +137,10 @@
         .loginTitle { text-align:center; font-size:1.35rem; font-weight:800; color:#0f172a; }
         .loginSub   { text-align:center; color:#64748b; font-size:.82rem; margin-bottom:18px; font-weight:600; }
 
-        /* ============ HANYA INI CSS BARU UNTUK TOMBOL LIHAT SANDI ============ */
         .loginField { position: relative; margin-bottom: 14px; }
         .loginField input {
             width: 100%;
-            padding: 18px 44px 9px 14px; /* kanan dilebihkan buat tombol mata */
+            padding: 18px 44px 9px 14px;
             border-radius: 14px;
             border: 2px solid #e2e8f0;
             background: #f8fafc;
@@ -181,7 +180,6 @@
             color:#64748b;
         }
         .pass-toggle:hover { color:#0f172a; }
-        /* ================================================================ */
 
         .btnLogin, .btnRegister {
             width:100%;
@@ -519,7 +517,6 @@
 </head>
 <body>
 
-<!-- ============ LOGIN + TOMBOL MATA ============ -->
 <div id="loginPage">
     <div class="loginCard">
         <div class="loginLogoWrap">
@@ -537,7 +534,6 @@
         <div class="loginField">
             <input type="password" id="passInput" placeholder=" " autocomplete="current-password">
             <label>🔒 Kata Sandi</label>
-            <!-- HANYA BARIS INI YANG DITAMBAHKAN -->
             <button type="button" class="pass-toggle" onclick="togglePassword('passInput',this)" tabindex="-1">🙈</button>
         </div>
 
@@ -546,7 +542,6 @@
     </div>
 </div>
 
-<!-- ============ DAFTAR + TOMBOL MATA DI 2 INPUT ============ -->
 <div id="registerPage">
     <div class="registerCard">
         <div class="loginLogoWrap">
@@ -564,13 +559,11 @@
         <div class="loginField">
             <input type="password" id="regPass" placeholder=" " autocomplete="new-password">
             <label>🔒 Kata Sandi (min. 6 karakter)</label>
-            <!-- HANYA BARIS INI YANG DITAMBAHKAN -->
             <button type="button" class="pass-toggle" onclick="togglePassword('regPass',this)" tabindex="-1">🙈</button>
         </div>
         <div class="loginField">
             <input type="password" id="regPassConfirm" placeholder=" " autocomplete="new-password">
             <label>🔁 Ulangi Kata Sandi</label>
-            <!-- HANYA BARIS INI YANG DITAMBAHKAN -->
             <button type="button" class="pass-toggle" onclick="togglePassword('regPassConfirm',this)" tabindex="-1">🙈</button>
         </div>
 
@@ -759,9 +752,6 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // ============================================================
-    // 👉 HANYA INI FUNGSI BARU, YANG LAIN 100% TIDAK DIUBAH
-    // ============================================================
     function togglePassword(id, btn){
         const el = document.getElementById(id);
         if(el.type === 'password'){
@@ -772,9 +762,9 @@
             btn.innerText = '🙈';
         }
     }
-    // ============================================================
 
     let currentUID = null;
+    let memoryTripLog = []; // Menyimpan riwayat sementara di memori, bukan di perangkat lokal
 
     function showLogin(){
         document.getElementById('registerPage').classList.remove('showAuth');
@@ -782,12 +772,14 @@
         document.getElementById('regError').style.display='none';
         document.getElementById('loginError').style.display='none';
     }
+    
     function showRegister(){
         document.getElementById('loginPage').classList.add('hiddenAuth');
         document.getElementById('registerPage').classList.add('showAuth');
         document.getElementById('loginError').style.display='none';
         document.getElementById('regError').style.display='none';
     }
+    
     async function handleRegister(){
         const email = document.getElementById('regEmail').value.trim();
         const pass1 = document.getElementById('regPass').value;
@@ -854,40 +846,50 @@
     function handleLogout(){
         if(confirm('Yakin ingin keluar dari akun ini?')){
             auth.signOut().then(()=>{
-                localStorage.removeItem('taxi_trip_log');
+                memoryTripLog = []; // Kosongkan memori sementara
                 toggleSidebar();
                 location.reload();
             });
         }
     }
 
+    // Fungsi mengambil log langsung dari Firebase ke variabel memori
     async function syncLogFromFirebase(){
         if(!currentUID) return;
-        const snap = await db.collection('users').doc(currentUID)
-                              .collection('trips').orderBy('createdAt','desc').limit(50).get();
-        const list = [];
-        snap.forEach(d => list.push(d.data()));
-        localStorage.setItem('taxi_trip_log', JSON.stringify(list));
-    }
-
-    const oriSaveTripToLog = saveTripToLog;
-    async function saveTripToLog(){
-        oriSaveTripToLog();
-        if(!currentUID) return;
-        const all = JSON.parse(localStorage.getItem('taxi_trip_log') || '[]');
-        if(all.length){
-            const last = all[0];
-            try{
-                await db.collection('users').doc(currentUID).collection('trips').add({
-                    ...last,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    uid: currentUID
-                });
-            }catch(e){ console.warn('Gagal simpan ke firebase',e); }
+        try {
+            const snap = await db.collection('users').doc(currentUID)
+                                  .collection('trips').orderBy('createdAt','desc').limit(50).get();
+            memoryTripLog = [];
+            snap.forEach(d => memoryTripLog.push(d.data()));
+        } catch(e) {
+            console.warn('Gagal sinkronisasi data', e);
         }
     }
 
-    // ============ SCRIPT ASLI 100% TIDAK DIUBAH ============
+    // Fungsi menyimpan riwayat langsung ke Firebase (tidak lewat local storage)
+    async function saveTripToLog(){
+        if(!currentUID) return;
+        
+        const tripData = {
+            date: new Date().toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'}),
+            distance: totalDistance.toFixed(2),
+            time: document.getElementById('timeDisplay').innerText,
+            wait: document.getElementById('waitDisplay').innerText,
+            tarifKm: TARIF_PER_KM,
+            fare: Math.floor(totalFare)
+        };
+
+        try{
+            await db.collection('users').doc(currentUID).collection('trips').add({
+                ...tripData,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                uid: currentUID
+            });
+            // Update tampilan log dari database setelah tersimpan
+            await syncLogFromFirebase();
+        }catch(e){ console.warn('Gagal simpan ke firebase',e); }
+    }
+
     let wakeLockObj = null;
     let originalTitle = document.title;
     let keepAliveInterval = null;
@@ -921,6 +923,7 @@
             await Notification.requestPermission();
         }
     }
+    
     async function activateWakeLock() {
         if ('wakeLock' in navigator) {
             try {
@@ -929,6 +932,7 @@
             } catch (err) { console.log("Wake Lock gagal: " + err.message); }
         }
     }
+    
     function deactivateWakeLock() { if(wakeLockObj){ wakeLockObj.release(); wakeLockObj=null; } }
 
     document.addEventListener('visibilitychange', async () => {
@@ -976,9 +980,18 @@
         const s=document.getElementById('sidebarMenu'), o=document.getElementById('sidebarOverlay');
         s.classList.toggle('active'); o.style.display = s.classList.contains('active')?'block':'none';
     }
-    function openModal(id){ toggleSidebar(); document.getElementById(id).style.display='flex'; if(id==='logModal') renderLogData(); }
+    
+    // Fungsi openModal sudah dimodifikasi agar mengecek apakah menu sedang aktif sebelum melakukan toggle
+    function openModal(id){ 
+        const s = document.getElementById('sidebarMenu');
+        if(s.classList.contains('active')) toggleSidebar();
+        document.getElementById(id).style.display='flex'; 
+        if(id==='logModal') renderLogData(); 
+    }
+    
     function closeModal(id){ document.getElementById(id).style.display='none'; }
     function formatInput(el){ let v=el.value.replace(/\./g,''); if(!isNaN(v)) el.value=v.replace(/\B(?=(\d{3})+(?!\d))/g,"."); }
+    
     function saveSettings(){
         TARIF_AWAL=parseInt(document.getElementById('inAwal').value.replace(/\./g,''))||0;
         TARIF_PER_KM=parseInt(document.getElementById('inKm').value.replace(/\./g,''))||0;
@@ -988,7 +1001,9 @@
         localStorage.setItem('set_tunggu',TARIF_TUNGGU_PER_JAM); localStorage.setItem('set_batas',BATAS_TUNGGU);
         closeModal('settingsModal'); showAlert('Berhasil ✅','Pengaturan tarif sudah tersimpan');
     }
+    
     function showAlert(t,m){ document.getElementById('alertTitle').innerText=t; document.getElementById('alertMessage').innerText=m; openModal('alertModal'); }
+    
     function updateUI(){
         document.getElementById('fareDisplay').innerText=Math.floor(totalFare).toLocaleString('id-ID');
         document.getElementById('distDisplay').innerText=totalDistance.toFixed(2);
@@ -997,21 +1012,25 @@
         let tm=Math.floor(tripSeconds/60),ts=tripSeconds%60;
         document.getElementById('timeDisplay').innerText=`${tm}:${ts<10?'0'+ts:ts}`;
     }
+    
     function calculateBearing(a,b,c,d){
         const r=deg=>deg*Math.PI/180, g=rad=>rad*180/Math.PI;
         const dl=r(d-b),y=Math.sin(dl)*Math.cos(r(c)),x=Math.cos(r(a))*Math.sin(r(c))-Math.sin(r(a))*Math.cos(r(c))*Math.cos(dl);
         return (g(Math.atan2(y,x))+360)%360;
     }
+    
     function toggleTrip(){
         const b=document.getElementById('btnAction'),s=document.getElementById('gpsStatusContainer');
         if(watchId===null){ openModal('startTripModal'); }
         else { stopTrip(); deactivateWakeLock(); saveTripToLog(); b.classList.remove('running'); b.innerText="Lanjut Perjalanan"; s.classList.remove('gps-active'); document.getElementById('gpsStatus').innerText="GPS: Terhenti"; document.getElementById('speedDisplay').innerText="0.0"; }
     }
+    
     function confirmStartTrip(){
         closeModal('startTripModal');
         const b=document.getElementById('btnAction'),s=document.getElementById('gpsStatusContainer');
         startTrip(); activateWakeLock(); b.classList.add('running'); b.innerText="Akhiri Perjalanan"; s.classList.add('gps-active');
     }
+    
     function startTrip(){
         if(totalFare===0) totalFare=parseFloat(TARIF_AWAL);
         tripTimer=setInterval(()=>{ tripSeconds++; updateUI(); },1000);
@@ -1037,10 +1056,12 @@
             }, getGeolocationOptions());
         }
     }
+    
     function startWaitTimer(){ if(!isWaiting){ isWaiting=true; waitTimer=setInterval(()=>{ waitSeconds++; totalFare+=(TARIF_TUNGGU_PER_JAM/3600); updateUI(); },1000); }}
     function stopWaitTimer(){ isWaiting=false; clearInterval(waitTimer); }
     function stopTrip(){ if(watchId){ navigator.geolocation.clearWatch(watchId); watchId=null; } stopWaitTimer(); clearInterval(tripTimer); lastCoords=null; updateUI(); }
     function resetMeter(){ openModal('resetModal'); }
+    
     function confirmReset(){
         closeModal('resetModal'); stopTrip(); deactivateWakeLock(); saveTripToLog();
         totalDistance=totalFare=waitSeconds=tripSeconds=0;
@@ -1053,11 +1074,13 @@
         const a=document.getElementById('navArrow'); if(a) a.style.transform='rotate(0deg)';
         updateUI();
     }
+    
     function calculateDistance(a,b,c,d){
         const R=6371,dl=(c-a)*Math.PI/180,dk=(d-b)*Math.PI/180;
         const x=Math.sin(dl/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dk/2)**2;
         return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
     }
+    
     function printReceipt(){
         const n=new Date().toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'});
         document.getElementById('p-date').innerText="Waktu: "+n;
@@ -1069,10 +1092,12 @@
         document.getElementById('p-total').innerText="Rp "+document.getElementById('fareDisplay').innerText;
         window.print();
     }
+    
+    // Merender menggunakan data dari variabel memoryTripLog
     function renderLogData(){
-        const c=document.getElementById('logContent'), t=JSON.parse(localStorage.getItem('taxi_trip_log')||'[]');
-        if(!t.length){ c.innerHTML='<div class="log-empty">Belum ada data perjalanan tersimpan</div>'; return; }
-        c.innerHTML = t.map(i=>`
+        const c=document.getElementById('logContent');
+        if(!memoryTripLog.length){ c.innerHTML='<div class="log-empty">Belum ada data perjalanan tersimpan</div>'; return; }
+        c.innerHTML = memoryTripLog.map(i=>`
             <div class="log-item">
                 <div class="log-date">📅 ${i.date}</div>
                 <div class="log-details">
@@ -1084,11 +1109,23 @@
                 <div class="log-fare">TOTAL: Rp ${Number(i.fare).toLocaleString('id-ID')}</div>
             </div>`).join('');
     }
-    function clearAllLog(){
+    
+    // Menghapus data dari Firebase secara massal
+    async function clearAllLog(){
         if(confirm('Yakin hapus SEMUA riwayat? Tindakan ini tidak bisa dibatalkan!')){
-            localStorage.removeItem('taxi_trip_log');
-            renderLogData();
-            showAlert('Berhasil','Semua riwayat telah dihapus');
+            if(currentUID) {
+                try {
+                    const snap = await db.collection('users').doc(currentUID).collection('trips').get();
+                    const batch = db.batch();
+                    snap.docs.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                    memoryTripLog = [];
+                    renderLogData();
+                    showAlert('Berhasil','Semua riwayat telah dihapus dari database');
+                } catch(e) {
+                    console.warn('Gagal menghapus log', e);
+                }
+            }
         }
     }
 </script>
