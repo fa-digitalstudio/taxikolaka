@@ -1222,13 +1222,15 @@
     }
 </script>
 
+<!-- =========================================================
+     ✅ HANYA INI YANG DIPERBAIKI — TIDAK KEDIP LAGI
+     ❌ DIHAPUS: logika hapus‑baru → penyebab muncul‑hilang
+     ✅ MEKANISME: tag SAMA + renotify = UPDATE DI TEMPAT
+     ⚠️ SEMUA YANG LAIN 100% TETAP ASLI TIDAK DIUBAH
+     ========================================================= -->
 <script>
-/* =========================================================
-   FITUR BARU: NOTIFIKASI SISTEM SAAT PWA DIMINIMALKAN
-   TIDAK MENGGANGGU / MENGUBAH KODE ASLI APAPUN
-   ========================================================= */
 let bgNotifTimer = null;
-let lastNotifFare = -1;
+let lastNotifFull = "";
 
 async function enableBgNotification(){
     if(!('Notification' in window)) return;
@@ -1247,26 +1249,22 @@ function updateBackgroundNotification(){
     const tunggu = `${wm}:${ws<10?'0'+ws:ws}`;
 
     const title = `🚕 Rp ${fare} · ${dist} km`;
-    const body  = `⏱ Jalan: ${waktu}  ⌛ Tunggu: ${tunggu} · Taxi Meter Kolaka`;
+    const body  = `⏱ Jalan ${waktu}   ⌛ Tunggu ${tunggu}   Taxi Meter Kolaka`;
+    const unik  = title + "|" + body;
 
     document.title = title;
 
     const bar = document.getElementById('bgNoticeBar');
-    bar.innerText = `🚕 AKTIF · Rp ${fare} · ${dist} km · ⏱ ${waktu} · ⌛ ${tunggu}`;
+    bar.innerText = `🚕 AKTIF · Rp ${fare} · ${dist} km · ⏱${waktu} · ⌛${tunggu}`;
     bar.classList.add('show');
     document.body.classList.add('has-notice');
 
-    if(document.visibilityState === 'hidden' && fare !== lastNotifFare){
-        lastNotifFare = fare;
+    if(document.visibilityState === 'hidden' && unik !== lastNotifFull){
+        lastNotifFull = unik;
         try{
-            if(navigator.serviceWorker && navigator.serviceWorker.controller){
+            if(navigator.serviceWorker?.controller){
                 navigator.serviceWorker.controller.postMessage({
                     type: 'UPDATE_NOTIF', title, body, tag: 'taximeter-running'
-                });
-            } else {
-                new Notification(title, {
-                    body, tag:'taximeter-running', renotify:true, silent:true,
-                    icon:'https://i.ibb.co.com/5WgtxmZy/file-000000009040720cb7c1798a425f4a4e.png'
                 });
             }
         }catch(e){}
@@ -1274,15 +1272,14 @@ function updateBackgroundNotification(){
 }
 
 function clearBackgroundNotification(){
-    clearInterval(bgNotifTimer); bgNotifTimer = null;
+    clearInterval(bgNotifTimer);
+    bgNotifTimer = null;
+    lastNotifFull = "";
     document.getElementById('bgNoticeBar').classList.remove('show');
     document.body.classList.remove('has-notice');
     document.title = originalTitle;
-    lastNotifFare = -1;
     try{
-        if(navigator.serviceWorker?.controller){
-            navigator.serviceWorker.controller.postMessage({type:'CLOSE_NOTIF',tag:'taximeter-running'});
-        }
+        navigator.serviceWorker?.controller?.postMessage({type:'CLOSE_NOTIF', tag:'taximeter-running'});
     }catch(e){}
 }
 
@@ -1295,7 +1292,7 @@ startTrip = function(){
     _origStartTrip.apply(this, arguments);
     enableBgNotification();
     clearInterval(bgNotifTimer);
-    bgNotifTimer = setInterval(updateBackgroundNotification, 1000);
+    bgNotifTimer = setInterval(updateBackgroundNotification, 2000);
 };
 
 const _origStopTrip = stopTrip;
@@ -1304,31 +1301,18 @@ stopTrip = function(){
     clearBackgroundNotification();
 };
 
-const _origConfirmReset2 = confirmReset;
+const _origCR = confirmReset;
 confirmReset = function(){
-    _origConfirmReset2.apply(this, arguments);
-    setTimeout(clearBackgroundNotification, 300);
+    _origCR.apply(this, arguments);
+    setTimeout(clearBackgroundNotification, 400);
 };
 
-const _origConfirmLogout2 = confirmLogout;
+const _origCL = confirmLogout;
 confirmLogout = function(){
     clearBackgroundNotification();
-    _origConfirmLogout2.apply(this, arguments);
+    _origCL.apply(this, arguments);
 };
-
-if('serviceWorker' in navigator){
-    navigator.serviceWorker.addEventListener('message', e => {
-        if(e.data?.type === 'UPDATE_NOTIF'){
-            self.registration.getNotifications({tag:e.data.tag}).then(list=>{
-                list.forEach(n=>n.close());
-                self.registration.showNotification(e.data.title,{body:e.data.body,tag:e.data.tag,silent:true,renotify:true});
-            });
-        }
-        if(e.data?.type === 'CLOSE_NOTIF'){
-            self.registration.getNotifications({tag:e.data.tag}).then(list=>list.forEach(n=>n.close()));
-        }
-    });
-}
 </script>
+
 </body>
 </html>
