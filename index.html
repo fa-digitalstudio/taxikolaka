@@ -327,7 +327,6 @@
 
         #btnAction { background: var(--accent-green); color: #fff; border: none; box-shadow: 0 4px 12px rgba(0, 184, 83, 0.3); }
         #btnAction.running { background: var(--danger); box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); }
-        #btnPrint { grid-column: span 2; background: #1f2937; color: #fff; border: none; box-shadow: 0 4px 12px rgba(31, 41, 55, 0.3);}
 
         .status-bar { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; }
         .gps-dot { width: 8px; height: 8px; background: var(--text-muted); border-radius: 50%; }
@@ -444,9 +443,11 @@
             background: #f8fafc;
         }
         .log-item {
-            padding: 12px;
+            padding: 14px;
             border-bottom: 1px solid #e2e8f0;
             background: white;
+            display: flex;
+            flex-direction: column;
         }
         .log-item:last-child { border-bottom: none; }
         .log-date {
@@ -465,8 +466,9 @@
         .log-fare {
             font-weight: 800;
             color: var(--accent-green);
-            font-size: 1rem;
-            margin-top: 4px;
+            font-size: 1.1rem;
+            margin-top: 6px;
+            margin-bottom: 8px;
         }
         .log-empty {
             padding: 28px 15px;
@@ -482,6 +484,20 @@
             box-shadow:0 8px 18px rgba(239,68,68,.35);
             margin-top: 4px;
         }
+        .btn-print-log {
+            background: #1f2937;
+            color: white;
+            border: none;
+            padding: 10px 12px;
+            font-size: 0.8rem;
+            font-weight: 800;
+            border-radius: 10px;
+            width: 100%;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(31, 41, 55, 0.2);
+            transition: all 0.2s ease;
+        }
+        .btn-print-log:active { transform: scale(0.96); }
 
         @media (min-width: 768px) {
             body { padding: 24px; }
@@ -615,8 +631,7 @@
         
         <div class="btn-group">
             <button type="button" id="btnAction" onclick="toggleTrip()">Mulai Perjalanan</button>
-            <button type="button" id="btnReset" onclick="resetMeter()">Reset</button>
-            <button type="button" id="btnPrint" onclick="printReceipt()">🖨️ Cetak Struk Tagihan</button>
+            <button type="button" id="btnReset" onclick="resetMeter()">Reset Meteran</button>
         </div>
         
         <div id="gpsStatusContainer" class="status-bar">
@@ -648,7 +663,7 @@
         <div class="input-group"><label>Tarif Tunggu / Jam (Rp)</label><input type="text" id="inTunggu" onkeyup="formatInput(this)"></div>
         <div class="input-group"><label>Batas Kecepatan Tunggu (km/h)</label><input type="text" id="inBatas" onkeyup="formatInput(this)"></div>
         <div class="modal-actions">
-            <button type="button" class="btn-premium-success" onclick="saveSettings()">💾 Simpan Perubahan</button>
+            <button type="button" class="btn-premium-success" onclick="saveSettings()">💾 Simpan ke Cloud</button>
             <button type="button" class="btn-premium-secondary" onclick="closeModal('settingsModal')">Batal</button>
         </div>
     </div>
@@ -724,6 +739,19 @@
     </div>
 </div>
 
+<div id="logoutModal" class="modal">
+    <div class="modal-content" style="text-align: center;">
+        <h3 style="color:#ef4444;">🚪 Konfirmasi Keluar</h3>
+        <p style="font-size: .9rem; color: #475569; line-height: 1.6; margin-bottom: 16px; font-weight: 600;">
+            Apakah Anda yakin ingin keluar / logout dari akun ini?
+        </p>
+        <div class="modal-actions">
+            <button type="button" class="btn-premium-primary" style="background:linear-gradient(135deg,#ef4444,#dc2626);box-shadow:0 10px 20px -6px rgba(239,68,68,.4);" onclick="confirmLogout()">Ya, Keluar Akun</button>
+            <button type="button" class="btn-premium-secondary" onclick="closeModal('logoutModal')">Batal</button>
+        </div>
+    </div>
+</div>
+
 <div id="alertModal" class="modal">
     <div class="modal-content" style="text-align: center;">
         <h3 id="alertTitle">ℹ️ Informasi</h3>
@@ -764,7 +792,13 @@
     }
 
     let currentUID = null;
-    let memoryTripLog = []; // Menyimpan riwayat sementara di memori, bukan di perangkat lokal
+    let memoryTripLog = []; 
+
+    // Default variable Tarif
+    let TARIF_AWAL = 9000;
+    let TARIF_PER_KM = 6500;
+    let TARIF_TUNGGU_PER_JAM = 60000;
+    let BATAS_TUNGGU = 25; 
 
     function showLogin(){
         document.getElementById('registerPage').classList.remove('showAuth');
@@ -808,6 +842,7 @@
             document.getElementById('userEmailBox').innerText = "👤 " + user.email;
             loginPage.classList.add('hiddenAuth');
             regPage.classList.remove('showAuth');
+            syncSettingsFromFirebase(); 
             syncLogFromFirebase();
         } else {
             currentUID = null;
@@ -844,16 +879,39 @@
     }
 
     function handleLogout(){
-        if(confirm('Yakin ingin keluar dari akun ini?')){
-            auth.signOut().then(()=>{
-                memoryTripLog = []; // Kosongkan memori sementara
-                toggleSidebar();
-                location.reload();
-            });
+        toggleSidebar();
+        openModal('logoutModal');
+    }
+
+    function confirmLogout(){
+        auth.signOut().then(()=>{
+            memoryTripLog = []; 
+            closeModal('logoutModal');
+            location.reload();
+        });
+    }
+
+    async function syncSettingsFromFirebase(){
+        if(!currentUID) return;
+        try {
+            const docSnap = await db.collection('users').doc(currentUID).get();
+            if(docSnap.exists){
+                const data = docSnap.data();
+                if(data.tarifAwal !== undefined) TARIF_AWAL = data.tarifAwal;
+                if(data.tarifKm !== undefined) TARIF_PER_KM = data.tarifKm;
+                if(data.tarifTunggu !== undefined) TARIF_TUNGGU_PER_JAM = data.tarifTunggu;
+                if(data.batasTunggu !== undefined) BATAS_TUNGGU = data.batasTunggu;
+                
+                document.getElementById('inAwal').value = TARIF_AWAL.toLocaleString('id-ID');
+                document.getElementById('inKm').value = TARIF_PER_KM.toLocaleString('id-ID');
+                document.getElementById('inTunggu').value = TARIF_TUNGGU_PER_JAM.toLocaleString('id-ID');
+                document.getElementById('inBatas').value = BATAS_TUNGGU.toLocaleString('id-ID');
+            }
+        } catch(e) {
+            console.warn('Gagal memuat pengaturan tarif', e);
         }
     }
 
-    // Fungsi mengambil log langsung dari Firebase ke variabel memori
     async function syncLogFromFirebase(){
         if(!currentUID) return;
         try {
@@ -862,11 +920,10 @@
             memoryTripLog = [];
             snap.forEach(d => memoryTripLog.push(d.data()));
         } catch(e) {
-            console.warn('Gagal sinkronisasi data', e);
+            console.warn('Gagal sinkronisasi log', e);
         }
     }
 
-    // Fungsi menyimpan riwayat langsung ke Firebase (tidak lewat local storage)
     async function saveTripToLog(){
         if(!currentUID) return;
         
@@ -875,6 +932,7 @@
             distance: totalDistance.toFixed(2),
             time: document.getElementById('timeDisplay').innerText,
             wait: document.getElementById('waitDisplay').innerText,
+            tarifAwal: TARIF_AWAL,
             tarifKm: TARIF_PER_KM,
             fare: Math.floor(totalFare)
         };
@@ -885,19 +943,13 @@
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 uid: currentUID
             });
-            // Update tampilan log dari database setelah tersimpan
             await syncLogFromFirebase();
-        }catch(e){ console.warn('Gagal simpan ke firebase',e); }
+        }catch(e){ console.warn('Gagal simpan log ke firebase',e); }
     }
 
     let wakeLockObj = null;
     let originalTitle = document.title;
     let keepAliveInterval = null;
-
-    let TARIF_AWAL = parseInt(localStorage.getItem('set_awal')) || 9000;
-    let TARIF_PER_KM = parseInt(localStorage.getItem('set_km')) || 6500;
-    let TARIF_TUNGGU_PER_JAM = parseInt(localStorage.getItem('set_tunggu')) || 60000;
-    let BATAS_TUNGGU = parseInt(localStorage.getItem('set_batas')) || 25; 
 
     let watchId = null, waitTimer = null, tripTimer = null, isWaiting = false, lastCoords = null;
     let totalDistance = parseFloat(localStorage.getItem('taxi_dist')) || 0;
@@ -909,6 +961,7 @@
 
     window.onload = () => {
         requestAllPermissions();
+        // Load inisal nilai form tarif sebelum data cloud diambil
         document.getElementById('inAwal').value = TARIF_AWAL.toLocaleString('id-ID');
         document.getElementById('inKm').value = TARIF_PER_KM.toLocaleString('id-ID');
         document.getElementById('inTunggu').value = TARIF_TUNGGU_PER_JAM.toLocaleString('id-ID');
@@ -981,7 +1034,6 @@
         s.classList.toggle('active'); o.style.display = s.classList.contains('active')?'block':'none';
     }
     
-    // Fungsi openModal sudah dimodifikasi agar mengecek apakah menu sedang aktif sebelum melakukan toggle
     function openModal(id){ 
         const s = document.getElementById('sidebarMenu');
         if(s.classList.contains('active')) toggleSidebar();
@@ -992,14 +1044,28 @@
     function closeModal(id){ document.getElementById(id).style.display='none'; }
     function formatInput(el){ let v=el.value.replace(/\./g,''); if(!isNaN(v)) el.value=v.replace(/\B(?=(\d{3})+(?!\d))/g,"."); }
     
-    function saveSettings(){
+    async function saveSettings(){
         TARIF_AWAL=parseInt(document.getElementById('inAwal').value.replace(/\./g,''))||0;
         TARIF_PER_KM=parseInt(document.getElementById('inKm').value.replace(/\./g,''))||0;
         TARIF_TUNGGU_PER_JAM=parseInt(document.getElementById('inTunggu').value.replace(/\./g,''))||0;
         BATAS_TUNGGU=parseInt(document.getElementById('inBatas').value.replace(/\./g,''))||25;
-        localStorage.setItem('set_awal',TARIF_AWAL); localStorage.setItem('set_km',TARIF_PER_KM);
-        localStorage.setItem('set_tunggu',TARIF_TUNGGU_PER_JAM); localStorage.setItem('set_batas',BATAS_TUNGGU);
-        closeModal('settingsModal'); showAlert('Berhasil ✅','Pengaturan tarif sudah tersimpan');
+        
+        if(currentUID){
+            try {
+                await db.collection('users').doc(currentUID).set({
+                    tarifAwal: TARIF_AWAL,
+                    tarifKm: TARIF_PER_KM,
+                    tarifTunggu: TARIF_TUNGGU_PER_JAM,
+                    batasTunggu: BATAS_TUNGGU
+                }, { merge: true });
+                closeModal('settingsModal'); 
+                showAlert('Berhasil ✅','Pengaturan tarif sudah tersimpan di Cloud.');
+            } catch(e) {
+                showAlert('Gagal ❌','Gagal menyimpan pengaturan: ' + e.message);
+            }
+        } else {
+            showAlert('Gagal ❌','Anda belum login!');
+        }
     }
     
     function showAlert(t,m){ document.getElementById('alertTitle').innerText=t; document.getElementById('alertMessage').innerText=m; openModal('alertModal'); }
@@ -1081,23 +1147,23 @@
         return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
     }
     
-    function printReceipt(){
-        const n=new Date().toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'});
-        document.getElementById('p-date').innerText="Waktu: "+n;
-        document.getElementById('p-awal').innerText="Rp "+TARIF_AWAL.toLocaleString('id-ID');
-        document.getElementById('p-km').innerText="Rp "+TARIF_PER_KM.toLocaleString('id-ID');
-        document.getElementById('p-dist').innerText=document.getElementById('distDisplay').innerText+" KM";
-        document.getElementById('p-time').innerText=document.getElementById('timeDisplay').innerText;
-        document.getElementById('p-wait').innerText=document.getElementById('waitDisplay').innerText;
-        document.getElementById('p-total').innerText="Rp "+document.getElementById('fareDisplay').innerText;
+    function printLogReceipt(index){
+        const i = memoryTripLog[index];
+        if(!i) return;
+        document.getElementById('p-date').innerText="Waktu: "+i.date;
+        document.getElementById('p-awal').innerText="Rp "+Number(i.tarifAwal || TARIF_AWAL).toLocaleString('id-ID');
+        document.getElementById('p-km').innerText="Rp "+Number(i.tarifKm || TARIF_PER_KM).toLocaleString('id-ID');
+        document.getElementById('p-dist').innerText=i.distance+" KM";
+        document.getElementById('p-time').innerText=i.time;
+        document.getElementById('p-wait').innerText=i.wait;
+        document.getElementById('p-total').innerText="Rp "+Number(i.fare).toLocaleString('id-ID');
         window.print();
     }
     
-    // Merender menggunakan data dari variabel memoryTripLog
     function renderLogData(){
         const c=document.getElementById('logContent');
         if(!memoryTripLog.length){ c.innerHTML='<div class="log-empty">Belum ada data perjalanan tersimpan</div>'; return; }
-        c.innerHTML = memoryTripLog.map(i=>`
+        c.innerHTML = memoryTripLog.map((i, index)=>`
             <div class="log-item">
                 <div class="log-date">📅 ${i.date}</div>
                 <div class="log-details">
@@ -1107,10 +1173,10 @@
                     <span>💵 /km: Rp ${Number(i.tarifKm||TARIF_PER_KM).toLocaleString('id-ID')}</span>
                 </div>
                 <div class="log-fare">TOTAL: Rp ${Number(i.fare).toLocaleString('id-ID')}</div>
+                <button type="button" class="btn-print-log" onclick="printLogReceipt(${index})">🖨️ Cetak Struk Tagihan</button>
             </div>`).join('');
     }
     
-    // Menghapus data dari Firebase secara massal
     async function clearAllLog(){
         if(confirm('Yakin hapus SEMUA riwayat? Tindakan ini tidak bisa dibatalkan!')){
             if(currentUID) {
