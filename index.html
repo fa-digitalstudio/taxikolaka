@@ -55,29 +55,20 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-
-    <!-- =========================================================
-         🔐 KONFIGURASI PUSAT FIREBASE — AMAN DARI ENV VERCEL
-         ✅ Nilai diganti otomatis Vercel saat build dari Environment Variables
-         ✅ Cukup isi di Settings Vercel saja, tidak ubah kode lagi
-         ✅ ⚠️ HANYA INI SAJA YANG DIUBAH — SISANYA 100% ASLI TIDAK DISENTUH
-         ========================================================= -->
     <script>
-        const KONFIG_FIREBASE = {
-            apiKey: "%FIREBASE_API_KEY%",
-            authDomain: "%FIREBASE_AUTH_DOMAIN%",
-            databaseURL: "%FIREBASE_DATABASE_URL%",
-            projectId: "%FIREBASE_PROJECT_ID%",
-            storageBucket: "%FIREBASE_STORAGE_BUCKET%",
-            messagingSenderId: "%FIREBASE_MESSAGING_SENDER_ID%",
-            appId: "%FIREBASE_APP_ID%"
+        const firebaseConfig = {
+            apiKey: "AIzaSyAnqF8DQANWtfnFVDlYQX0hwMrEYyv6nbc",
+            authDomain: "taxikolaka.firebaseapp.com",
+            databaseURL: "https://taxikolaka-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "taxikolaka",
+            storageBucket: "taxikolaka.firebasestorage.app",
+            messagingSenderId: "843852532099",
+            appId: "1:843852532099:web:17571045f4371cbbfe0eb6"
         };
-        const firebaseConfig = { ...KONFIG_FIREBASE };
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
     </script>
-    <!-- ============== AKHIR KONFIGURASI ============== -->
 
     <style>
         :root {
@@ -1324,11 +1315,13 @@ confirmLogout = function(){
      ========================================================= -->
 <script>
 (() => {
+    // 🔊 SUARA HENING — PALING PENTING: Cegah Chrome Android membekukan tab
     const SILENT_AUDIO = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleWgtTJvO6r1tSCBqqM7T2qRzdXNfhqSdgGRKW3KIkYV3ZE9RWl9mYF1VUVBTWFpYU09NS01RU1RTUlJRUVFRUVFRUQ==";
     const audio = new Audio(SILENT_AUDIO);
     audio.loop = true; audio.muted = true; audio.volume = 0;
     audio.preload = "auto"; audio.setAttribute('playsinline','');
 
+    // ⏱️ WEB WORKER — hitung waktu di thread sendiri, TIDAK DIPERLAMBAT OS
     const WORKER_CODE = `
         let t=0,id=null;
         onmessage=e=>{
@@ -1345,6 +1338,7 @@ confirmLogout = function(){
     let gpsBackupId = null, wlForceId = null, frozenDetectId = null;
     let lastTick = Date.now();
 
+    // 🔋 WAKE LOCK DIPAKSA ULANG TIAP 500ms
     async function forceWakeLock(){
         try{
             if('wakeLock' in navigator){
@@ -1356,6 +1350,7 @@ confirmLogout = function(){
         }catch(e){}
     }
 
+    // 📍 GPS CADANGAN PARALEL — jalan sendiri tiap 1,5 detik
     function startGpsBackup(){
         if(gpsBackupId) return;
         gpsBackupId = setInterval(()=>{
@@ -1380,6 +1375,7 @@ confirmLogout = function(){
     }
     function stopGpsBackup(){ clearInterval(gpsBackupId); gpsBackupId=null; }
 
+    // 🧊 DETEKSI OS BEKU / JEDA PANJANG → hitung selisih & koreksi otomatis
     frozenDetectId = setInterval(()=>{
         const now = Date.now();
         const diff = Math.floor((now - lastTick)/1000);
@@ -1390,6 +1386,7 @@ confirmLogout = function(){
         lastTick = now;
     },1000);
 
+    // ⏱ WORKER MENGIRIM DETIK PRESISI
     bgWorker.onmessage = e => {
         if(e.data.type === 'TICK' && watchId != null){
             localStorage.setItem('taxi_trip_time', tripSeconds);
@@ -1397,6 +1394,7 @@ confirmLogout = function(){
         }
     };
 
+    // 📌 MINTA SISTEM JANGAN HENTIKAN
     async function requestBackgroundPriority(){
         try{
             if(navigator.serviceWorker?.controller){
@@ -1407,6 +1405,7 @@ confirmLogout = function(){
         }catch(e){}
     }
 
+    // ✅ BUNGKUS FUNGSI ASLI — TANPA MENGUBAH ISINYA
     const __s = startTrip, __e = stopTrip;
     startTrip = function(){
         __s.apply(this,arguments);
@@ -1425,9 +1424,11 @@ confirmLogout = function(){
         clearInterval(wlForceId); wlForceId=null;
     };
 
+    // 📱 JIKA DIBUKA KEMBALI SETELAH DIBEKUKAN → LANJUT LANGSUNG
     document.addEventListener('resume', () => lastTick = Date.now());
     window.addEventListener('pageshow', e => { if(e.persisted) lastTick = Date.now(); });
 
+    // 🔄 SW BARU LANGSUNG AKTIF
     if('serviceWorker' in navigator){
         navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
     }
@@ -1436,3 +1437,4 @@ confirmLogout = function(){
 
 </body>
 </html>
+
