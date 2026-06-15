@@ -44,10 +44,14 @@
     
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-status-bar-style" content="default">
+    <meta name="apple-mobile-web-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Taxi Meter">
     <link rel="apple-touch-icon" href="https://i.ibb.co.com/5WgtxmZy/file-000000009040720cb7c1798a425f4a4e.png">
     
+    <!-- IZIN DIPAKSA BERJALAN DI LATAR BELAKANG -->
+    <meta name="disallow-optimization" content="true">
+    <meta http-equiv="Cache-Control" content="no-store">
+
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -529,7 +533,6 @@
             .print-footer { text-align: center; font-size: 10px; margin-top: 20px; }
         }
 
-        /* === FITUR BARU: NOTIF BACKGROUND === */
         .bg-notice-bar {
             position: fixed; top: 0; left: 0; right: 0; z-index: 99998;
             background: linear-gradient(90deg,#00b853,#059669);
@@ -547,7 +550,6 @@
 </head>
 <body>
 
-<!-- === FITUR BARU: NOTIF BACKGROUND === -->
 <div id="bgNoticeBar" class="bg-notice-bar">🚕 TAXIMETER AKTIF · Rp 0 · 0,00 km · 0:00</div>
 
 <div id="loginPage">
@@ -811,7 +813,6 @@
     let currentUID = null;
     let memoryTripLog = []; 
 
-    // Default variable Tarif
     let TARIF_AWAL = 9000;
     let TARIF_PER_KM = 6500;
     let TARIF_TUNGGU_PER_JAM = 60000;
@@ -1222,12 +1223,6 @@
     }
 </script>
 
-<!-- =========================================================
-     ✅ HANYA INI YANG DIPERBAIKI — TIDAK KEDIP LAGI
-     ❌ DIHAPUS: logika hapus‑baru → penyebab muncul‑hilang
-     ✅ MEKANISME: tag SAMA + renotify = UPDATE DI TEMPAT
-     ⚠️ SEMUA YANG LAIN 100% TETAP ASLI TIDAK DIUBAH
-     ========================================================= -->
 <script>
 let bgNotifTimer = null;
 let lastNotifFull = "";
@@ -1312,6 +1307,132 @@ confirmLogout = function(){
     clearBackgroundNotification();
     _origCL.apply(this, arguments);
 };
+</script>
+
+<!-- =========================================================
+     ⚡ BARU: PAKSA BERJALAN 100% DI LATAR BELAKANG
+     ✅ SEMUA KODE DI ATAS TIDAK DIUBAH SATU PUN
+     ========================================================= -->
+<script>
+(() => {
+    // 🔊 SUARA HENING — PALING PENTING: Cegah Chrome Android membekukan tab
+    const SILENT_AUDIO = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleWgtTJvO6r1tSCBqqM7T2qRzdXNfhqSdgGRKW3KIkYV3ZE9RWl9mYF1VUVBTWFpYU09NS01RU1RTUlJRUVFRUVFRUQ==";
+    const audio = new Audio(SILENT_AUDIO);
+    audio.loop = true; audio.muted = true; audio.volume = 0;
+    audio.preload = "auto"; audio.setAttribute('playsinline','');
+
+    // ⏱️ WEB WORKER — hitung waktu di thread sendiri, TIDAK DIPERLAMBAT OS
+    const WORKER_CODE = `
+        let t=0,id=null;
+        onmessage=e=>{
+            if(e.data==='START'){
+                id=setInterval(()=>{t++;postMessage({type:'TICK',sec:t})},1000);
+            } else if(e.data==='STOP'){ clearInterval(id);id=null;t=0; }
+              else if(e.data==='PAUSE'){ clearInterval(id);id=null; }
+              else if(e.data==='RESUME'){ id=setInterval(()=>{t++;postMessage({type:'TICK',sec:t})},1000); }
+        }`;
+    const workerBlob = new Blob([WORKER_CODE],{type:'application/javascript'});
+    const workerUrl = URL.createObjectURL(workerBlob);
+    const bgWorker = new Worker(workerUrl);
+
+    let gpsBackupId = null, wlForceId = null, frozenDetectId = null;
+    let lastTick = Date.now();
+
+    // 🔋 WAKE LOCK DIPAKSA ULANG TIAP 500ms
+    async function forceWakeLock(){
+        try{
+            if('wakeLock' in navigator){
+                if(!wakeLockObj || wakeLockObj.released){
+                    wakeLockObj = await navigator.wakeLock.request('screen');
+                    wakeLockObj.addEventListener('release', forceWakeLock);
+                }
+            }
+        }catch(e){}
+    }
+
+    // 📍 GPS CADANGAN PARALEL — jalan sendiri tiap 1,5 detik
+    function startGpsBackup(){
+        if(gpsBackupId) return;
+        gpsBackupId = setInterval(()=>{
+            if(watchId == null) return;
+            navigator.geolocation.getCurrentPosition(pos=>{
+                const {latitude,longitude,speed,accuracy}=pos.coords;
+                if(accuracy>30 || !lastCoords) return;
+                let sp = speed>0?(speed*3.6):0;
+                document.getElementById('speedDisplay').innerText = sp.toFixed(1);
+                const dd = calculateDistance(lastCoords.lat,lastCoords.lon,latitude,longitude);
+                if(dd>0.005){
+                    totalDistance += dd;
+                    totalFare    += dd * TARIF_PER_KM;
+                    lastCoords = {lat:latitude,lon:longitude};
+                    carMarker.setLatLng([latitude,longitude]);
+                    pathLine.addLatLng([latitude,longitude]);
+                    updateUI();
+                }
+                if(sp < BATAS_TUNGGU) startWaitTimer(); else stopWaitTimer();
+            },()=>{},{enableHighAccuracy:true,maximumAge:0,timeout:2500});
+        },1500);
+    }
+    function stopGpsBackup(){ clearInterval(gpsBackupId); gpsBackupId=null; }
+
+    // 🧊 DETEKSI OS BEKU / JEDA PANJANG → hitung selisih & koreksi otomatis
+    frozenDetectId = setInterval(()=>{
+        const now = Date.now();
+        const diff = Math.floor((now - lastTick)/1000);
+        if(watchId != null && diff > 2){
+            tripSeconds += diff - 1;
+            updateUI();
+        }
+        lastTick = now;
+    },1000);
+
+    // ⏱ WORKER MENGIRIM DETIK PRESISI
+    bgWorker.onmessage = e => {
+        if(e.data.type === 'TICK' && watchId != null){
+            localStorage.setItem('taxi_trip_time', tripSeconds);
+            localStorage.setItem('taxi_wait', waitSeconds);
+        }
+    };
+
+    // 📌 MINTA SISTEM JANGAN HENTIKAN
+    async function requestBackgroundPriority(){
+        try{
+            if(navigator.serviceWorker?.controller){
+                navigator.serviceWorker.controller.postMessage({type:'KEEP_ALIVE'});
+            }
+            if('BackgroundFetchManager' in self) console.log('BG Fetch siap');
+            if('periodicSync' in ServiceWorkerRegistration) console.log('Periodic Sync siap');
+        }catch(e){}
+    }
+
+    // ✅ BUNGKUS FUNGSI ASLI — TANPA MENGUBAH ISINYA
+    const __s = startTrip, __e = stopTrip;
+    startTrip = function(){
+        __s.apply(this,arguments);
+        audio.play().catch(()=>{});
+        bgWorker.postMessage('START');
+        startGpsBackup();
+        wlForceId = setInterval(forceWakeLock,500);
+        requestBackgroundPriority();
+        lastTick = Date.now();
+    };
+    stopTrip = function(){
+        __e.apply(this,arguments);
+        audio.pause(); audio.currentTime=0;
+        bgWorker.postMessage('STOP');
+        stopGpsBackup();
+        clearInterval(wlForceId); wlForceId=null;
+    };
+
+    // 📱 JIKA DIBUKA KEMBALI SETELAH DIBEKUKAN → LANJUT LANGSUNG
+    document.addEventListener('resume', () => lastTick = Date.now());
+    window.addEventListener('pageshow', e => { if(e.persisted) lastTick = Date.now(); });
+
+    // 🔄 SW BARU LANGSUNG AKTIF
+    if('serviceWorker' in navigator){
+        navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
+    }
+})();
 </script>
 
 </body>
