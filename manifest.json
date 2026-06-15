@@ -1,11 +1,21 @@
 {
   "name": "Taxi Meter - Driver Kolaka",
   "short_name": "Taxi Meter",
-  "start_url": "./index.html",
+  "description": "Taximeter digital gratis, hitung tarif otomatis pakai GPS, bisa berjalan di latar belakang walau layar mati.",
+  "start_url": "./",
+  "scope": "./",
+  "id": "taximeter-driver-kolaka",
   "display": "standalone",
+  "display_override": ["standalone", "fullscreen", "window-controls-overlay"],
+  "launch_handler": { "client_mode": "navigate-existing" },
+  "handle_links": "preferred",
   "background_color": "#eef2f6",
   "theme_color": "#00b853",
   "orientation": "portrait",
+  "categories": ["navigation", "productivity", "travel"],
+  "lang": "id",
+  "dir": "ltr",
+
   "icons": [
     {
       "src": "./1781169139708.png",
@@ -14,10 +24,49 @@
       "purpose": "any maskable"
     },
     {
-      "src": "/1781169139708.png",
+      "src": "./1781169139708.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+
+  "permissions": [
+    "geolocation",
+    "notifications",
+    "backgroundsync",
+    "periodicBackgroundSync",
+    "wakeLock",
+    "storage",
+    "accessibilityEvents"
+  ],
+
+  "optional_permissions": [
+    "unlimitedStorage"
+  ],
+
+  "features": [
+    "Background Sync",
+    "Periodic Background Sync",
+    "Geolocation High Accuracy",
+    "Screen Wake Lock",
+    "Persistent Notifications"
+  ],
+
+  "background": {
+    "service_worker": {
+      "src": "./sw.js",
+      "scope": "./",
+      "update_via_cache": "none"
+    }
+  },
+
+  "notification": {
+    "icon": "./1781169139708.png",
+    "badge": "./1781169139708.png",
+    "vibrate": false,
+    "renotify": true
+  },
+
+  "prefer_related_applications": false
 }
