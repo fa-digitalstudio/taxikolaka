@@ -1,0 +1,8 @@
+{
+  "buildCommand": "node replace-env.js",
+  "outputDirectory": ".",
+  "installCommand": "echo 'Tidak perlu install'",
+  "env": {
+    "ENABLE_VARIABLE_REPLACEMENT": "1"
+  }
+}
