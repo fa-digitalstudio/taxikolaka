@@ -43,6 +43,7 @@
     <meta name="theme-color" content="#00b853">
     
     <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Taxi Meter">
@@ -104,6 +105,7 @@
             background: linear-gradient(135deg, #0ea5e9 0%, #00b853 50%, #059669 100%);
             display: flex; align-items: center; justify-content: center;
             padding: 20px;
+            overflow-y: auto;
         }
         #loginPage.hiddenAuth { display: none; }
 
@@ -112,6 +114,7 @@
             background: linear-gradient(135deg, #6366f1 0%, #4285F4 50%, #0ea5e9 100%);
             display: none; align-items: center; justify-content: center;
             padding: 20px;
+            overflow-y: auto;
         }
         #registerPage.showAuth { display: flex; }
 
@@ -122,6 +125,7 @@
             padding: 32px 24px;
             box-shadow: 0 30px 80px -20px rgba(0,0,0,0.45);
             animation: loginPop .55s cubic-bezier(.2,.9,.25,1.2);
+            margin: auto;
         }
         @keyframes loginPop {
             from { opacity: 0; transform: translateY(40px) scale(.9); }
@@ -265,6 +269,7 @@
             box-shadow: -10px 0 30px rgba(15,23,42,0.15);
             transition: right 0.3s cubic-bezier(.2,.8,.2,1); z-index: 1000;
             padding: 22px 18px; display: flex; flex-direction: column; gap: 12px;
+            overflow-y: auto;
         }
         .sidebar.active { right: 0; }
         .sidebar-header {
@@ -318,7 +323,7 @@
         .grid-info { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .grid-info .value { font-size: 2.2rem; }
 
-        #map { width: 100%; height: 200px; border-radius: var(--btn-radius); border: 1px solid var(--border-color); z-index: 1; }
+        #map { width: 100%; height: 200px; border-radius: var(--btn-radius); border: 1px solid var(--border-color); z-index: 1; background: #e5e7eb; }
 
         .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
@@ -359,6 +364,7 @@
                 inset 0 1px 0 #fff;
             animation: modalFadeIn .45s cubic-bezier(.2,.9,.25,1.2) forwards;
             position: relative;
+            margin: auto;
         }
         @keyframes modalFadeIn {
             from { opacity: 0; transform: translateY(28px) scale(.92); }
@@ -502,19 +508,116 @@
         }
         .btn-print-log:active { transform: scale(0.96); }
 
-        @media (min-width: 768px) {
-            body { padding: 24px; }
-            .wrapper { max-width: 850px; }
+        /* =========================================================
+           📱 PENYESUAIAN TAMPILAN LANSKAP (HP & TABLET)
+           ========================================================= */
+        @media (orientation: landscape) and (min-width: 540px) {
+            body {
+                padding: 8px 14px;
+                justify-content: center;
+            }
+            body.has-notice {
+                padding-top: 30px;
+            }
+            .wrapper {
+                max-width: 960px;
+                gap: 8px;
+            }
+            .community-header {
+                padding: 8px 14px;
+                border-radius: 14px;
+            }
+            .community-logo {
+                width: 32px;
+                height: 32px;
+            }
+            .community-name {
+                font-size: 0.95rem;
+            }
+            .community-sub {
+                font-size: 0.68rem;
+            }
             .meter-box {
                 display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 16px;
+                grid-template-columns: 1.05fr 1.15fr;
+                grid-template-rows: auto auto auto auto;
+                gap: 8px 12px;
+                padding: 12px;
+                border-radius: 18px;
             }
-            .screen:first-child { grid-column: span 2; }
-            .grid-info { grid-column: 1; }
-            #map { grid-column: 2; height: 100%; min-height: 240px; }
-            .btn-group { grid-column: span 2; }
-            #gpsStatusContainer { grid-column: span 2; }
+            .meter-box > .screen:first-child {
+                grid-column: 1;
+                grid-row: 1;
+                padding: 8px 14px;
+            }
+            .meter-box > .screen:first-child .value {
+                font-size: 2.5rem;
+            }
+            .grid-info {
+                grid-column: 1;
+                grid-row: 2;
+                gap: 8px;
+            }
+            .grid-info .screen {
+                padding: 7px 12px;
+            }
+            .grid-info .label {
+                font-size: 0.65rem;
+            }
+            .grid-info .value {
+                font-size: 1.45rem;
+            }
+            .btn-group {
+                grid-column: 1;
+                grid-row: 3;
+                gap: 8px;
+            }
+            .btn-group button {
+                padding: 11px 8px;
+                font-size: 0.78rem;
+            }
+            #gpsStatusContainer {
+                grid-column: 1;
+                grid-row: 4;
+                font-size: 0.7rem;
+            }
+            #map {
+                grid-column: 2;
+                grid-row: 1 / 5;
+                height: 100%;
+                min-height: 220px;
+            }
+            .modal-content {
+                padding: 18px 20px;
+                max-width: 420px;
+            }
+            .log-container {
+                max-height: 45vh;
+            }
+        }
+
+        @media (min-width: 768px) and (min-height: 550px) {
+            body { padding: 24px; }
+            .wrapper { max-width: 920px; gap: 14px; }
+            .community-header { padding: 14px 16px; }
+            .community-logo { width: 40px; height: 40px; }
+            .community-name { font-size: 1.05rem; }
+            .meter-box {
+                display: grid;
+                grid-template-columns: 1fr 1.15fr;
+                grid-template-rows: auto auto auto auto;
+                gap: 14px 16px;
+                padding: 20px;
+            }
+            .meter-box > .screen:first-child { grid-column: 1; grid-row: 1; padding: 14px 18px; }
+            .meter-box > .screen:first-child .value { font-size: 3.4rem; }
+            .grid-info { grid-column: 1; grid-row: 2; gap: 12px; }
+            .grid-info .screen { padding: 12px 16px; }
+            .grid-info .value { font-size: 2rem; }
+            .btn-group { grid-column: 1; grid-row: 3; }
+            .btn-group button { padding: 16px 10px; font-size: 0.9rem; }
+            #gpsStatusContainer { grid-column: 1; grid-row: 4; }
+            #map { grid-column: 2; grid-row: 1 / 5; height: 100%; min-height: 320px; }
         }
 
         @media print {
@@ -1006,7 +1109,12 @@
     function deactivateWakeLock() { if(wakeLockObj){ wakeLockObj.release(); wakeLockObj=null; } }
 
     document.addEventListener('visibilitychange', async () => {
-        if (document.visibilityState === 'visible') { await activateWakeLock(); updateUI(); document.title = originalTitle; }
+        if (document.visibilityState === 'visible') {
+            await activateWakeLock();
+            updateUI();
+            document.title = originalTitle;
+            if (map) setTimeout(() => map.invalidateSize(), 200);
+        }
     });
 
     function initBackgroundMode() {
@@ -1027,7 +1135,10 @@
 
     function initMap() {
         map = L.map('map', { zoomControl: true }).setView([-4.05, 121.6], 15);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
         pathLine = L.polyline([], {color: '#00b853', weight: 6, opacity: 0.8}).addTo(map);
         const navArrowIcon = L.divIcon({
             className: 'nav-icon-wrapper',
@@ -1044,6 +1155,10 @@
             return btn;
         };
         locateControl.addTo(map);
+
+        window.addEventListener('resize', () => { if (map) setTimeout(() => map.invalidateSize(), 200); });
+        window.addEventListener('orientationchange', () => { if (map) setTimeout(() => map.invalidateSize(), 300); });
+        setTimeout(() => map.invalidateSize(), 300);
     }
 
     function toggleSidebar(){
@@ -1310,26 +1425,51 @@ confirmLogout = function(){
 </script>
 
 <!-- =========================================================
-     ⚡ BARU: PAKSA BERJALAN 100% DI LATAR BELAKANG
-     ✅ SEMUA KODE DI ATAS TIDAK DIUBAH SATU PUN
+     ⚡ PAKSA BERJALAN 100% DI LATAR BELAKANG (MODE APLIKASI / PWA)
      ========================================================= -->
 <script>
 (() => {
-    // 🔊 SUARA HENING — PALING PENTING: Cegah Chrome Android membekukan tab
+    // 🔊 SUARA HENING NON-MUTED (VOLUME MIKRO) + MEDIA SESSION API
+    // Chrome Android mengabaikan audio jika muted=true / volume=0, maka diset volume 0.005 + MediaSession
     const SILENT_AUDIO = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleWgtTJvO6r1tSCBqqM7T2qRzdXNfhqSdgGRKW3KIkYV3ZE9RWl9mYF1VUVBTWFpYU09NS01RU1RTUlJRUVFRUVFRUQ==";
     const audio = new Audio(SILENT_AUDIO);
-    audio.loop = true; audio.muted = true; audio.volume = 0;
-    audio.preload = "auto"; audio.setAttribute('playsinline','');
+    audio.loop = true;
+    audio.muted = false;
+    audio.volume = 0.005;
+    audio.preload = "auto";
+    audio.setAttribute('playsinline', '');
 
-    // ⏱️ WEB WORKER — hitung waktu di thread sendiri, TIDAK DIPERLAMBAT OS
+    function activateMediaSession() {
+        if ('mediaSession' in navigator) {
+            try {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: 'Taximeter Driver Kolaka Aktif',
+                    artist: 'Argometer & GPS Latar Belakang',
+                    album: 'Driver Kolaka'
+                });
+                navigator.mediaSession.playbackState = 'playing';
+            } catch (e) {}
+        }
+    }
+
+    function deactivateMediaSession() {
+        if ('mediaSession' in navigator) {
+            try {
+                navigator.mediaSession.playbackState = 'none';
+            } catch (e) {}
+        }
+    }
+
+    // ⏱️ WEB WORKER — hitung waktu di thread sendiri agar tidak dibekukan OS saat minimize
     const WORKER_CODE = `
         let t=0,id=null;
         onmessage=e=>{
             if(e.data==='START'){
+                clearInterval(id);
                 id=setInterval(()=>{t++;postMessage({type:'TICK',sec:t})},1000);
             } else if(e.data==='STOP'){ clearInterval(id);id=null;t=0; }
               else if(e.data==='PAUSE'){ clearInterval(id);id=null; }
-              else if(e.data==='RESUME'){ id=setInterval(()=>{t++;postMessage({type:'TICK',sec:t})},1000); }
+              else if(e.data==='RESUME'){ clearInterval(id);id=setInterval(()=>{t++;postMessage({type:'TICK',sec:t})},1000); }
         }`;
     const workerBlob = new Blob([WORKER_CODE],{type:'application/javascript'});
     const workerUrl = URL.createObjectURL(workerBlob);
@@ -1376,19 +1516,27 @@ confirmLogout = function(){
     function stopGpsBackup(){ clearInterval(gpsBackupId); gpsBackupId=null; }
 
     // 🧊 DETEKSI OS BEKU / JEDA PANJANG → hitung selisih & koreksi otomatis
-    frozenDetectId = setInterval(()=>{
+    function syncElapsedDrift() {
         const now = Date.now();
         const diff = Math.floor((now - lastTick)/1000);
         if(watchId != null && diff > 2){
             tripSeconds += diff - 1;
+            if (isWaiting) {
+                waitSeconds += diff - 1;
+                totalFare += ((diff - 1) * (TARIF_TUNGGU_PER_JAM / 3600));
+            }
             updateUI();
         }
         lastTick = now;
-    },1000);
+    }
 
-    // ⏱ WORKER MENGIRIM DETIK PRESISI
+    frozenDetectId = setInterval(syncElapsedDrift, 1000);
+
+    // ⏱ WORKER MENGIRIM DETIK PRESISI DI LATAR BELAKANG
     bgWorker.onmessage = e => {
         if(e.data.type === 'TICK' && watchId != null){
+            syncElapsedDrift();
+            if (audio.paused) audio.play().catch(()=>{});
             localStorage.setItem('taxi_trip_time', tripSeconds);
             localStorage.setItem('taxi_wait', waitSeconds);
         }
@@ -1410,8 +1558,10 @@ confirmLogout = function(){
     startTrip = function(){
         __s.apply(this,arguments);
         audio.play().catch(()=>{});
+        activateMediaSession();
         bgWorker.postMessage('START');
         startGpsBackup();
+        clearInterval(wlForceId);
         wlForceId = setInterval(forceWakeLock,500);
         requestBackgroundPriority();
         lastTick = Date.now();
@@ -1419,14 +1569,15 @@ confirmLogout = function(){
     stopTrip = function(){
         __e.apply(this,arguments);
         audio.pause(); audio.currentTime=0;
+        deactivateMediaSession();
         bgWorker.postMessage('STOP');
         stopGpsBackup();
         clearInterval(wlForceId); wlForceId=null;
     };
 
     // 📱 JIKA DIBUKA KEMBALI SETELAH DIBEKUKAN → LANJUT LANGSUNG
-    document.addEventListener('resume', () => lastTick = Date.now());
-    window.addEventListener('pageshow', e => { if(e.persisted) lastTick = Date.now(); });
+    document.addEventListener('resume', () => { syncElapsedDrift(); lastTick = Date.now(); });
+    window.addEventListener('pageshow', e => { if(e.persisted) { syncElapsedDrift(); lastTick = Date.now(); } });
 
     // 🔄 SW BARU LANGSUNG AKTIF
     if('serviceWorker' in navigator){
@@ -1437,4 +1588,3 @@ confirmLogout = function(){
 
 </body>
 </html>
-
