@@ -248,6 +248,27 @@
         .community-name { font-size: 1.05rem; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;}
         .community-sub { font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: 600; }
 
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pip-btn {
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            color: #059669;
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 6px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            text-transform: uppercase;
+        }
+
         .menu-btn {
             background: transparent;
             border: none;
@@ -719,9 +740,12 @@
                 <span class="community-sub">TAXIMETER FREE</span>
             </div>
         </div>
-        <button class="menu-btn" onclick="toggleSidebar()">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-        </button>
+        <div class="header-actions">
+            <button type="button" class="pip-btn" onclick="toggleFloatingOverlay()" title="Mode Layar Melayang">🪟 Overlay</button>
+            <button class="menu-btn" onclick="toggleSidebar()">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+        </div>
     </div>
 
     <div class="meter-box">
@@ -770,6 +794,7 @@
         <span class="close-btn" onclick="toggleSidebar()">×</span>
     </div>
     <div class="userEmailBox" id="userEmailBox">👤 —</div>
+    <button type="button" onclick="toggleSidebar(); toggleFloatingOverlay();">🪟 Mode Layar Melayang (Overlay)</button>
     <button type="button" onclick="openModal('settingsModal')">🔧 Pengaturan Tarif</button>
     <button type="button" onclick="openModal('logModal')">📋 Riwayat Perjalanan</button>
     <button type="button" onclick="openModal('donationModal')">💰 Donasi / Dukungan</button>
@@ -1349,7 +1374,6 @@ async function enableBgNotification(){
 
 function updateBackgroundNotification(){
     if(watchId === null) return;
-    if(Notification.permission !== 'granted') return;
 
     const fare = Math.floor(totalFare).toLocaleString('id-ID');
     const dist = totalDistance.toFixed(2);
@@ -1359,7 +1383,7 @@ function updateBackgroundNotification(){
     const tunggu = `${wm}:${ws<10?'0'+ws:ws}`;
 
     const title = `🚕 Rp ${fare} · ${dist} km`;
-    const body  = `⏱ Jalan ${waktu}   ⌛ Tunggu ${tunggu}   Taxi Meter Kolaka`;
+    const body  = `⏱ Jalan ${waktu}  |  ⌛ Tunggu ${tunggu}  ·  Driver Kolaka`;
     const unik  = title + "|" + body;
 
     document.title = title;
@@ -1369,13 +1393,43 @@ function updateBackgroundNotification(){
     bar.classList.add('show');
     document.body.classList.add('has-notice');
 
-    if(document.visibilityState === 'hidden' && unik !== lastNotifFull){
+    // Update Widget MediaSession (Tampil Live di Lock Screen & Panel Notifikasi Android)
+    if ('mediaSession' in navigator) {
+        try {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: `🚕 Rp ${fare} (${dist} km)`,
+                artist: `⏱ Jalan ${waktu} • ⌛ Tunggu ${tunggu}`,
+                album: 'Taximeter Driver Kolaka',
+                artwork: [
+                    { src: 'https://i.ibb.co.com/5WgtxmZy/file-000000009040720cb7c1798a425f4a4e.png', sizes: '512x512', type: 'image/png' }
+                ]
+            });
+            navigator.mediaSession.playbackState = 'playing';
+        } catch(e) {}
+    }
+
+    // Kirim & Perbarui Notifikasi Sistem di Bilah Layar / Lock Screen
+    if(Notification.permission === 'granted' && unik !== lastNotifFull){
         lastNotifFull = unik;
+        const notifOptions = {
+            body: body,
+            icon: 'https://i.ibb.co.com/5WgtxmZy/file-000000009040720cb7c1798a425f4a4e.png',
+            badge: 'https://i.ibb.co.com/5WgtxmZy/file-000000009040720cb7c1798a425f4a4e.png',
+            tag: 'taximeter-running',
+            renotify: false,
+            silent: true,
+            requireInteraction: true
+        };
         try{
             if(navigator.serviceWorker?.controller){
                 navigator.serviceWorker.controller.postMessage({
                     type: 'UPDATE_NOTIF', title, body, tag: 'taximeter-running'
                 });
+            }
+            if('serviceWorker' in navigator){
+                navigator.serviceWorker.ready.then(reg => {
+                    reg.showNotification(title, notifOptions).catch(()=>{});
+                }).catch(()=>{});
             }
         }catch(e){}
     }
@@ -1390,6 +1444,11 @@ function clearBackgroundNotification(){
     document.title = originalTitle;
     try{
         navigator.serviceWorker?.controller?.postMessage({type:'CLOSE_NOTIF', tag:'taximeter-running'});
+        if('serviceWorker' in navigator){
+            navigator.serviceWorker.ready.then(reg => {
+                reg.getNotifications({tag: 'taximeter-running'}).then(list => list.forEach(n => n.close()));
+            }).catch(()=>{});
+        }
     }catch(e){}
 }
 
@@ -1400,7 +1459,7 @@ document.addEventListener('visibilitychange', () => {
 const _origStartTrip = startTrip;
 startTrip = function(){
     _origStartTrip.apply(this, arguments);
-    enableBgNotification();
+    enableBgNotification().then(() => updateBackgroundNotification());
     clearInterval(bgNotifTimer);
     bgNotifTimer = setInterval(updateBackgroundNotification, 2000);
 };
@@ -1425,12 +1484,122 @@ confirmLogout = function(){
 </script>
 
 <!-- =========================================================
+     🪟 OVERLAY LAYAR MELAYANG (FLOATING MINI METER / PiP)
+     ========================================================= -->
+<script>
+const pipCanvas = document.createElement('canvas');
+pipCanvas.width = 420;
+pipCanvas.height = 210;
+const pipCtx = pipCanvas.getContext('2d');
+
+const pipVideo = document.createElement('video');
+pipVideo.muted = true;
+pipVideo.playsInline = true;
+pipVideo.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;bottom:0;right:0;';
+document.body.appendChild(pipVideo);
+
+let pipRenderTimer = null;
+
+function renderPipFrame() {
+    const w = pipCanvas.width, h = pipCanvas.height;
+    // Latar belakang gelap kontras tinggi agar mudah dibaca saat melayang di atas Maps
+    pipCtx.fillStyle = '#0f172a';
+    pipCtx.fillRect(0, 0, w, h);
+
+    // Garis aksen atas
+    pipCtx.fillStyle = watchId !== null ? '#00b853' : '#64748b';
+    pipCtx.fillRect(0, 0, w, 10);
+
+    // Status Header
+    pipCtx.fillStyle = '#94a3b8';
+    pipCtx.font = 'bold 16px sans-serif';
+    pipCtx.fillText(watchId !== null ? '🚕 DRIVER KOLAKA • AKTIF' : '🚕 DRIVER KOLAKA • STANDBY', 20, 38);
+
+    // Tarif Utama
+    const fareStr = 'Rp ' + Math.floor(totalFare).toLocaleString('id-ID');
+    pipCtx.fillStyle = '#00e676';
+    pipCtx.font = 'bold 54px monospace';
+    pipCtx.fillText(fareStr, 20, 102);
+
+    // Garis pemisah
+    pipCtx.strokeStyle = '#1e293b';
+    pipCtx.lineWidth = 2;
+    pipCtx.beginPath();
+    pipCtx.moveTo(20, 122);
+    pipCtx.lineTo(w - 20, 122);
+    pipCtx.stroke();
+
+    // Info Jarak, Waktu Jalan, Waktu Tunggu
+    const distStr = totalDistance.toFixed(2) + ' km';
+    const tm = Math.floor(tripSeconds/60), ts = tripSeconds%60;
+    const waktuStr = `${tm}:${ts<10?'0'+ts:ts}`;
+    const wm = Math.floor(waitSeconds/60), ws = waitSeconds%60;
+    const tungguStr = `${wm}:${ws<10?'0'+ws:ws}`;
+
+    pipCtx.fillStyle = '#94a3b8';
+    pipCtx.font = 'bold 13px sans-serif';
+    pipCtx.fillText('JARAK', 20, 148);
+    pipCtx.fillText('WAKTU JALAN', 160, 148);
+    pipCtx.fillText('TUNGGU', 310, 148);
+
+    pipCtx.fillStyle = '#ffffff';
+    pipCtx.font = 'bold 26px monospace';
+    pipCtx.fillText(distStr, 20, 182);
+    pipCtx.fillText(waktuStr, 160, 182);
+    pipCtx.fillText(tungguStr, 310, 182);
+}
+
+async function toggleFloatingOverlay() {
+    try {
+        if (!('pictureInPictureEnabled' in document) && !pipVideo.requestPictureInPicture) {
+            showAlert('Info Overlay', 'Browser Anda tidak mendukung jendela melayang (PiP). Gunakan Chrome Android versi terbaru & gunakan bilah notifikasi layar.');
+            return;
+        }
+        if (document.pictureInPictureElement) {
+            await document.exitPictureInPicture();
+            clearInterval(pipRenderTimer);
+            return;
+        }
+        renderPipFrame();
+        if (!pipVideo.srcObject) {
+            pipVideo.srcObject = pipCanvas.captureStream(2);
+        }
+        await pipVideo.play();
+        await pipVideo.requestPictureInPicture();
+
+        clearInterval(pipRenderTimer);
+        pipRenderTimer = setInterval(renderPipFrame, 1000);
+    } catch (err) {
+        showAlert('Info Overlay', 'Tidak dapat membuka jendela melayang: ' + err.message);
+    }
+}
+
+pipVideo.addEventListener('leavepictureinpicture', () => {
+    clearInterval(pipRenderTimer);
+});
+
+// Daftarkan Auto-Overlay saat user menekan tombol Home / pindah aplikasi di Chrome Android
+if ('mediaSession' in navigator) {
+    try {
+        navigator.mediaSession.setActionHandler('enterpictureinpicture', async () => {
+            if (watchId !== null && !document.pictureInPictureElement) {
+                renderPipFrame();
+                if (!pipVideo.srcObject) pipVideo.srcObject = pipCanvas.captureStream(2);
+                await pipVideo.play();
+                await pipVideo.requestPictureInPicture();
+                clearInterval(pipRenderTimer);
+                pipRenderTimer = setInterval(renderPipFrame, 1000);
+            }
+        });
+    } catch (e) {}
+}
+</script>
+
+<!-- =========================================================
      ⚡ PAKSA BERJALAN 100% DI LATAR BELAKANG (MODE APLIKASI / PWA)
      ========================================================= -->
 <script>
 (() => {
-    // 🔊 SUARA HENING NON-MUTED (VOLUME MIKRO) + MEDIA SESSION API
-    // Chrome Android mengabaikan audio jika muted=true / volume=0, maka diset volume 0.005 + MediaSession
     const SILENT_AUDIO = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleWgtTJvO6r1tSCBqqM7T2qRzdXNfhqSdgGRKW3KIkYV3ZE9RWl9mYF1VUVBTWFpYU09NS01RU1RTUlJRUVFRUVFRUQ==";
     const audio = new Audio(SILENT_AUDIO);
     audio.loop = true;
@@ -1445,7 +1614,10 @@ confirmLogout = function(){
                 navigator.mediaSession.metadata = new MediaMetadata({
                     title: 'Taximeter Driver Kolaka Aktif',
                     artist: 'Argometer & GPS Latar Belakang',
-                    album: 'Driver Kolaka'
+                    album: 'Driver Kolaka',
+                    artwork: [
+                        { src: 'https://i.ibb.co.com/5WgtxmZy/file-000000009040720cb7c1798a425f4a4e.png', sizes: '512x512', type: 'image/png' }
+                    ]
                 });
                 navigator.mediaSession.playbackState = 'playing';
             } catch (e) {}
@@ -1460,7 +1632,6 @@ confirmLogout = function(){
         }
     }
 
-    // ⏱️ WEB WORKER — hitung waktu di thread sendiri agar tidak dibekukan OS saat minimize
     const WORKER_CODE = `
         let t=0,id=null;
         onmessage=e=>{
@@ -1478,7 +1649,6 @@ confirmLogout = function(){
     let gpsBackupId = null, wlForceId = null, frozenDetectId = null;
     let lastTick = Date.now();
 
-    // 🔋 WAKE LOCK DIPAKSA ULANG TIAP 500ms
     async function forceWakeLock(){
         try{
             if('wakeLock' in navigator){
@@ -1490,7 +1660,6 @@ confirmLogout = function(){
         }catch(e){}
     }
 
-    // 📍 GPS CADANGAN PARALEL — jalan sendiri tiap 1,5 detik
     function startGpsBackup(){
         if(gpsBackupId) return;
         gpsBackupId = setInterval(()=>{
@@ -1515,7 +1684,6 @@ confirmLogout = function(){
     }
     function stopGpsBackup(){ clearInterval(gpsBackupId); gpsBackupId=null; }
 
-    // 🧊 DETEKSI OS BEKU / JEDA PANJANG → hitung selisih & koreksi otomatis
     function syncElapsedDrift() {
         const now = Date.now();
         const diff = Math.floor((now - lastTick)/1000);
@@ -1532,7 +1700,6 @@ confirmLogout = function(){
 
     frozenDetectId = setInterval(syncElapsedDrift, 1000);
 
-    // ⏱ WORKER MENGIRIM DETIK PRESISI DI LATAR BELAKANG
     bgWorker.onmessage = e => {
         if(e.data.type === 'TICK' && watchId != null){
             syncElapsedDrift();
@@ -1542,7 +1709,6 @@ confirmLogout = function(){
         }
     };
 
-    // 📌 MINTA SISTEM JANGAN HENTIKAN
     async function requestBackgroundPriority(){
         try{
             if(navigator.serviceWorker?.controller){
@@ -1553,7 +1719,6 @@ confirmLogout = function(){
         }catch(e){}
     }
 
-    // ✅ BUNGKUS FUNGSI ASLI — TANPA MENGUBAH ISINYA
     const __s = startTrip, __e = stopTrip;
     startTrip = function(){
         __s.apply(this,arguments);
@@ -1575,11 +1740,9 @@ confirmLogout = function(){
         clearInterval(wlForceId); wlForceId=null;
     };
 
-    // 📱 JIKA DIBUKA KEMBALI SETELAH DIBEKUKAN → LANJUT LANGSUNG
     document.addEventListener('resume', () => { syncElapsedDrift(); lastTick = Date.now(); });
     window.addEventListener('pageshow', e => { if(e.persisted) { syncElapsedDrift(); lastTick = Date.now(); } });
 
-    // 🔄 SW BARU LANGSUNG AKTIF
     if('serviceWorker' in navigator){
         navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
     }
